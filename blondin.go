@@ -62,9 +62,6 @@ func WeightedByPercentage(config string) (Balancer, error) {
 		return nil, fmt.Errorf("invalid configuration %s, total percentages add up to %.2f", config, totalPercent)
 	}
 
-	fmt.Println(choices)
-	fmt.Println(percentages)
-
 	var aliasMethod *alias.Alias
 	aliasMethod, err = alias.New(percentages)
 	if err != nil {
