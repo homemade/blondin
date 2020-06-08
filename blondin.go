@@ -14,6 +14,7 @@ type Balancer interface {
 }
 
 // An efficient solution for weighted random should be the Alias method https://en.wikipedia.org/wiki/Alias_method
+// See https://www.keithschwarz.com/darts-dice-coins/ for a fuller explanation
 type weightedByPercentageUsingAliasMethod struct {
 	choices     []string
 	aliasMethod *alias.Alias
