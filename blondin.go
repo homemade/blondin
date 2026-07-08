@@ -1,10 +1,13 @@
 package blondin
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/homemade/blondin/alias"
 )
@@ -18,11 +21,15 @@ type Balancer interface {
 type weightedByPercentageUsingAliasMethod struct {
 	choices     []string
 	aliasMethod *alias.Alias
-	rng         *rand.Rand
+	// mu guards rng, since *rand.Rand is not safe for concurrent use.
+	mu  sync.Mutex
+	rng *rand.Rand
 }
 
-func (b weightedByPercentageUsingAliasMethod) Next() string {
+func (b *weightedByPercentageUsingAliasMethod) Next() string {
+	b.mu.Lock()
 	i := b.aliasMethod.Gen(b.rng)
+	b.mu.Unlock()
 	return b.choices[i]
 }
 
@@ -69,10 +76,16 @@ func WeightedByPercentage(config string) (Balancer, error) {
 		return nil, fmt.Errorf("failed to initialise alias method %v", err)
 	}
 
-	seed := len(choices)
-	rng := rand.New(rand.NewSource(int64(seed)))
+	// Seed from crypto/rand so the sequence varies per process instance.
+	// Seeding with a fixed value (e.g. len(choices)) makes every process
+	// replay the identical draw order, starving minority choices at startup.
+	var seed int64
+	if err = binary.Read(cryptorand.Reader, binary.LittleEndian, &seed); err != nil {
+		return nil, fmt.Errorf("failed to seed random number generator %v", err)
+	}
+	rng := rand.New(rand.NewSource(seed))
 
-	return weightedByPercentageUsingAliasMethod{
+	return &weightedByPercentageUsingAliasMethod{
 		choices:     choices,
 		aliasMethod: aliasMethod,
 		rng:         rng,
